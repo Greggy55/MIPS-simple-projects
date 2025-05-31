@@ -13,9 +13,14 @@
 # Prompts
 	input_number_of_rounds:	.asciiz	"Podaj liczbe rund: "
 	input_field_number:	.asciiz "Podaj numer wolnego pola: "
+# -------
+
+# GUI
 	v_bar:			.asciiz "|"
 	new_line:		.asciiz "\n"
-# -------
+	player1_char:		.word 'O'
+	player2_char:		.word 'X'
+# ---
 
 .text
 
@@ -44,8 +49,13 @@ new_game:
 		#jal check_draw
 		jal print_board
 	
-		jal player_move
-		#jal pc_move
+		li $a0, 1
+		li $a1, 1
+		jal player_a0_move
+		
+		li $a0, 2
+		li $a1, 1
+		jal player_a0_move
 		
 		j game_loop
 	
@@ -57,7 +67,46 @@ new_game:
 	addi $sp, $sp, 4
 	jr $ra
 
-player_move:
+
+# Player a0 move
+# a0 - player number (1-2)
+# a1 - is human true/false (false = 0, true != 0)
+player_a0_move:
+	addi $sp, $sp, -4
+	sw $ra, 0($sp)
+	# body start
+	
+	set_char:
+		beq $a0, 1, set_p1_char
+		set_p2_char:
+			lw $a2, player2_char
+			j set_player_type
+		set_p1_char:
+			lw $a2, player1_char
+	
+	set_player_type:
+		beqz $a1, ai
+		human:
+			jal human_move
+			j set_ij
+		ai:
+			jal ai_move
+			
+	set_ij:
+		move $a0, $v0	# from human_move
+		move $a1, $v1	# - || -
+		jal set_ij_element
+	
+	# body end
+	lw $ra, 0($sp)
+	addi $sp, $sp, 4
+	jr $ra
+
+
+# Human move
+# v0 - field i
+# v1 - field j
+human_move:
 	addi $sp, $sp, -4
 	sw $ra, 0($sp)
 	# body start
@@ -68,14 +117,43 @@ player_move:
 	
 	li $v0, 5
 	syscall
-	move $s1, $v0
-		
-	#jal convert_ij
-	jal set_ij_element
+	
+	move $a0, $v0
+	jal convert_to_ij
 	
 	# body end
 	lw $ra, 0($sp)
 	addi $sp, $sp, 4
+	jr $ra
+
+
+ai_move:
+	addi $sp, $sp, -4
+	sw $ra, 0($sp)
+	# body start
+
+	# body end
+	lw $ra, 0($sp)
+	addi $sp, $sp, 4
+	jr $ra
+
+
+# Convert n to [i][j]
+# a0 - n (1-9)
+# v0 - i
+# v1 - j
+convert_to_ij:
+	# body start
+	
+	addi $t0, $a0, -1	# t0 = n - 1
+	divu $t0, $t0, 3	# t0 = (n - 1) / 3
+	move $v0, $t0		# x = v0
+	
+	mul $t1, $t0, 3		# t1 = x * 3
+	addi $t2, $a0, -1	# t2 = n - 1
+	sub $v1, $t2, $t1	# y = (n - 1) - (x * 3)
+	
+	# body end
 	jr $ra
 
 
@@ -156,7 +234,7 @@ print_board:
 	lw $s2, row_col_size	# main loop range
 	subi $s2, $s2, 1	# row loop range
 	print_loop:
-		bgt $s0, $s2, end_print_board
+		bgt $s0, $s2, exit_print_loop
 		
 		move $a0, $s0
 		move $a1, $s1
@@ -177,7 +255,7 @@ print_board:
           	  	li $s1, 0		# reset col
           	  	addi $s0, $s0, 1	# next row
           	  	j print_loop
-	end_print_board:
+	exit_print_loop:
 	
 	# body end	
 	lw $ra, 0($sp)
