@@ -13,13 +13,15 @@
 # Prompts
 	input_number_of_rounds:	.asciiz	"Podaj liczbe rund: "
 	input_field_number:	.asciiz "Podaj numer wolnego pola: "
+	game_end:		.asciiz "Koniec Gry!"
+	puste:			.asciiz "Puste"
 # -------
 
 # GUI
 	v_bar:			.asciiz "|"
 	new_line:		.asciiz "\n"
-	player1_char:		.word 'O'
-	player2_char:		.word 'X'
+	player1_char:		.word 79
+	player2_char:		.word 88
 # ---
 
 .text
@@ -45,8 +47,15 @@ new_game:
 	# body start
 	
 	game_loop:
-		#jal check_winner
-		#jal check_draw
+		jal check_game_end
+		bnez $v0, print_results
+		#move $a0, $v0
+		#li $v0, 1
+		#syscall
+		#la $a0, new_line
+		#li $v0, 4
+		#syscall
+		
 		jal print_board
 	
 		li $a0, 1
@@ -60,11 +69,100 @@ new_game:
 		j game_loop
 	
 	print_results:
-		
+	li $v0, 4
+	la $a0, game_end
+	syscall
 	
 	# body end
 	lw $ra, 0($sp)
 	addi $sp, $sp, 4
+	jr $ra
+
+
+# Check ame end
+# v0 - (0 - not end, p1_char - p1_wins, p2_char - p2_wins, 1 - draw)
+check_game_end:
+	addi $sp, $sp, -16
+	sw $ra, 0($sp)
+	sw $s0, 4($sp)
+	sw $s1, 8($sp)
+	sw $s2, 12($sp)
+	# body start
+	
+	li $s0, 0	# row index
+	li $s1, 0	# col index
+	lw $s2, row_col_size	# main loop range
+	subi $s2, $s2, 1	# row loop range
+	
+	li $t0, 0	# prev value
+	li $t1, 0	# curr value
+	lw $t2, player1_char
+	lw $t3, player2_char
+	li $t4, 1	# can be draw
+	li $t5, 1	# can win
+	
+	check_loop:
+		bgt $s0, $s2, exit_check_loop_with_no_winner
+		
+		move $t0, $t1
+		
+		move $a0, $s0
+		move $a1, $s1
+		jal get_ij_element
+		move $t1, $v0
+			# print\
+			li $v0, 11
+			move $a0, $t1
+			syscall
+			li $v0, 4
+			la $a0, new_line
+			syscall
+			# del
+		
+		check_emptiness:			
+			beq $t1, $t2, is_not_empty
+			beq $t1, $t3, is_not_empty
+		is_empty:
+			li $t4, 0
+			li $t5, 0
+			j check_next
+		is_not_empty:
+			beq $t1, $t0, can_win
+			j cannot_win
+		
+		can_win:
+			li $t5, 1
+		cannot_win:
+			li $t5, 0
+			
+		check_next:	
+		beq $s1, $s2, check_next_row
+        
+        	check_next_col:
+           	 	addi $s1, $s1, 1	# next col
+           	 	j check_loop
+       	 	check_next_row:
+       	 		beq $t5, 1, exit_check_loop_with_winner		# check winner
+       	 	
+          	  	li $s1, 0		# reset col
+          	  	addi $s0, $s0, 1	# next row
+          	  	j check_loop
+          	  	
+        exit_check_loop_with_winner:
+        	move $v0, $t1
+        	j end_check
+        	
+	exit_check_loop_with_no_winner:
+		move $v0, $t4
+		j end_check
+	
+	end_check:
+	# body end
+	lw $ra, 0($sp)
+	lw $s0, 4($sp)
+	lw $s1, 8($sp)
+	lw $s2, 12($sp)
+	addi $sp, $sp, 16
 	jr $ra
 
 
