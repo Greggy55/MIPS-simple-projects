@@ -14,7 +14,8 @@
 	input_number_of_rounds:	.asciiz	"Podaj liczbe rund: "
 	input_field_number:	.asciiz "Podaj numer wolnego pola: "
 	game_end:		.asciiz "Koniec Gry!"
-	puste:			.asciiz "Puste"
+	puste:			.asciiz "E_"
+	pelne:			.asciiz "F_"
 # -------
 
 # GUI
@@ -97,45 +98,40 @@ check_game_end:								# zapelnienie dziala, rozny wiersz nie
 	li $t4, 1	# can be draw
 	li $t5, 1	# can win
 	
-	check_loop:
-		bgt $s0, $s2, exit_check_loop_with_no_winner
+		#bgt $s0, $s2, exit_check_loop_with_no_winner
 		
-		move $t0, $t1
-		
-		move $a0, $s0
-		move $a1, $s1
-		jal get_ij_element_address
-		lw $t1, 0($v0)
-		
-		check_emptiness:			
-			beq $t1, $t2, is_not_empty
-			beq $t1, $t3, is_not_empty
-		is_empty:
-			li $t4, 0
-			li $t5, 0
-			j check_next
-		is_not_empty:
-			beq $t1, $t0, can_win
-			j cannot_win
-		
-		can_win:
-			li $t5, 1
-		cannot_win:
-			li $t5, 0
+		check_row:
+			beq $s0, $s2, check_col
+			beq $s1, $s2, check_next_row
+			jal check_field
+			add $s1, $s1, 1
+			j check_row
 			
-		check_next:	
-		beq $s1, $s2, check_next_row
-        
-        	check_next_col:
-           	 	addi $s1, $s1, 1	# next col
-           	 	j check_loop
-       	 	check_next_row:
-       	 		beq $t5, 1, exit_check_loop_with_winner		# check winner
-       	 	
-          	  	li $s1, 0		# reset col
-          	  	addi $s0, $s0, 1	# next row
-          	  	j check_loop
-          	  	
+		check_next_row:
+			beq $t5, 1, exit_check_loop_with_winner
+			li $t0, 0
+			li $s1, 0
+			add $s0, 1
+			j check_row
+		
+		check_col:
+			beq $s1, $s2, check_diagonal
+			beq $s0, $s2, check_next_col
+			jal check_field
+			add $s0, $s0, 1
+			j check_col
+			
+		check_next_col:
+			beq $t5, 1, exit_check_loop_with_winner
+			li $t0, 0
+			li $s0, 0
+			add $s1, 1
+			j check_col
+			
+		check_diagonal:							# tuaj dalej
+		
+# -----------------------------------------	
+ # -------------------------------------------         	  	
         exit_check_loop_with_winner:
         	move $v0, $t1
         	j end_check
@@ -151,6 +147,41 @@ check_game_end:								# zapelnienie dziala, rozny wiersz nie
 	lw $s1, 8($sp)
 	lw $s2, 12($sp)
 	addi $sp, $sp, 16
+	jr $ra
+	
+
+# Check field					
+check_field:
+	addi $sp, $sp, -4
+	sw $ra, 0($sp)
+	# body start
+	
+	move $t0, $t1
+		
+	move $a0, $s0
+	move $a1, $s1
+	jal get_ij_element_address
+	lw $t1, 0($v0)
+	
+	check_emptiness:			
+		beq $t1, $t2, is_not_empty
+		beq $t1, $t3, is_not_empty
+	is_empty:
+		li $t4, 0
+		li $t5, 0
+		jr $ra
+	is_not_empty:
+		beq $t1, $t0, can_win
+		j cannot_win
+		
+	can_win:
+		li $t5, 1
+	cannot_win:
+		li $t5, 0
+	
+	# body end
+	lw $ra, 0($sp)
+	addi $sp, $sp, 4
 	jr $ra
 
 
