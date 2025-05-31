@@ -46,17 +46,11 @@ new_game:
 	sw $ra, 0($sp)
 	# body start
 	
+	jal print_board
+	
 	game_loop:
 		jal check_game_end
 		bnez $v0, print_results
-		#move $a0, $v0
-		#li $v0, 1
-		#syscall
-		#la $a0, new_line
-		#li $v0, 4
-		#syscall
-		
-		jal print_board
 	
 		li $a0, 1
 		li $a1, 1
@@ -65,6 +59,8 @@ new_game:
 		li $a0, 2
 		li $a1, 1
 		jal player_a0_move
+		
+		jal print_board
 		
 		j game_loop
 	
@@ -81,7 +77,7 @@ new_game:
 
 # Check ame end
 # v0 - (0 - not end, p1_char - p1_wins, p2_char - p2_wins, 1 - draw)
-check_game_end:
+check_game_end:								# zapelnienie dziala, rozny wiersz nie
 	addi $sp, $sp, -16
 	sw $ra, 0($sp)
 	sw $s0, 4($sp)
@@ -108,16 +104,8 @@ check_game_end:
 		
 		move $a0, $s0
 		move $a1, $s1
-		jal get_ij_element
-		move $t1, $v0
-			# print\
-			li $v0, 11
-			move $a0, $t1
-			syscall
-			li $v0, 4
-			la $a0, new_line
-			syscall
-			# del
+		jal get_ij_element_address
+		lw $t1, 0($v0)
 		
 		check_emptiness:			
 			beq $t1, $t2, is_not_empty
@@ -255,11 +243,11 @@ convert_to_ij:
 	jr $ra
 
 
-# Get [i][j] element
+# Get [i][j] element address
 # a0 - row index
 # a1 - col index
-# v0 - return value
-get_ij_element:
+# v0 - return address
+get_ij_element_address:
 	addi $sp, $sp, -8
 	sw $s0, 0($sp)
 	sw $s1, 4($sp)
@@ -288,7 +276,7 @@ set_ij_element:
 	sw $ra, 0($sp)
 	# body start
 	
-	jal get_ij_element
+	jal get_ij_element_address
 	
 	sw $a2, 0($v0)
 	
@@ -306,7 +294,7 @@ print_ij_element:
 	sw $ra, 0($sp)
 	# body start
 	
-	jal get_ij_element
+	jal get_ij_element_address
 	
 	lw $a0, 0($v0)
 	li $v0, 11
