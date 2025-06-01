@@ -13,9 +13,10 @@
 # Prompts
 	input_number_of_rounds:	.asciiz	"Podaj liczbe rund: "
 	input_field_number:	.asciiz "Podaj numer wolnego pola: "
-	game_end:		.asciiz "Koniec Gry!"
-	puste:			.asciiz "E_"
-	pelne:			.asciiz "F_"
+	game_over:		.asciiz "Koniec Gry!\n"
+	winner:			.asciiz "Wygrywa gracz "
+	draw:			.asciiz "Remis"
+	debug_prompt:		.asciiz "\nDEBUG\n"
 # -------
 
 # GUI
@@ -51,7 +52,8 @@ new_game:
 	
 	game_loop:
 		jal check_game_end
-		bnez $v0, print_results
+		move $t0, $v0
+		bnez $t0, print_results
 	
 		li $a0, 1
 		li $a1, 1
@@ -67,122 +69,190 @@ new_game:
 	
 	print_results:
 	li $v0, 4
-	la $a0, game_end
+	la $a0, game_over
 	syscall
 	
+	beq $t0, 1, game_draw
+	game_winner:
+		li $v0, 4
+		la $a0, winner
+		syscall
+		li $v0, 11
+		move $a0, $t0
+		syscall
+		j game_end
+	game_draw:
+		li $v0, 4
+		la $a0, draw
+		syscall
+		j game_end
+	
+	game_end:
 	# body end
 	lw $ra, 0($sp)
 	addi $sp, $sp, 4
 	jr $ra
-
 
 # Check ame end
 # v0 - (0 - not end, p1_char - p1_wins, p2_char - p2_wins, 1 - draw)
-check_game_end:								# zapelnienie dziala, rozny wiersz nie
-	addi $sp, $sp, -16
+check_game_end:
+    	addi $sp, $sp, -16
 	sw $ra, 0($sp)
-	sw $s0, 4($sp)
-	sw $s1, 8($sp)
-	sw $s2, 12($sp)
-	# body start
-	
-	li $s0, 0	# row index
-	li $s1, 0	# col index
-	lw $s2, row_col_size	# main loop range
-	subi $s2, $s2, 1	# row loop range
-	
-	li $t0, 0	# prev value
-	li $t1, 0	# curr value
-	lw $t2, player1_char
-	lw $t3, player2_char
-	li $t4, 1	# can be draw
-	li $t5, 1	# can win
-	
-		#bgt $s0, $s2, exit_check_loop_with_no_winner
-		
-		check_row:
-			beq $s0, $s2, check_col
-			beq $s1, $s2, check_next_row
-			jal check_field
-			add $s1, $s1, 1
-			j check_row
-			
-		check_next_row:
-			beq $t5, 1, exit_check_loop_with_winner
-			li $t0, 0
-			li $s1, 0
-			add $s0, 1
-			j check_row
-		
-		check_col:
-			beq $s1, $s2, check_diagonal
-			beq $s0, $s2, check_next_col
-			jal check_field
-			add $s0, $s0, 1
-			j check_col
-			
-		check_next_col:
-			beq $t5, 1, exit_check_loop_with_winner
-			li $t0, 0
-			li $s0, 0
-			add $s1, 1
-			j check_col
-			
-		check_diagonal:							# tuaj dalej
-		
-# -----------------------------------------	
- # -------------------------------------------         	  	
-        exit_check_loop_with_winner:
-        	move $v0, $t1
-        	j end_check
-        	
-	exit_check_loop_with_no_winner:
-		move $v0, $t4
-		j end_check
-	
-	end_check:
-	# body end
-	lw $ra, 0($sp)
-	lw $s0, 4($sp)
-	lw $s1, 8($sp)
-	lw $s2, 12($sp)
-	addi $sp, $sp, 16
-	jr $ra
-	
+   	sw $s0, 4($sp)
+    	sw $s1, 8($sp)
+    	sw $s2, 12($sp)
 
-# Check field					
-check_field:
-	addi $sp, $sp, -4
-	sw $ra, 0($sp)
-	# body start
-	
-	move $t0, $t1
-		
-	move $a0, $s0
-	move $a1, $s1
-	jal get_ij_element_address
-	lw $t1, 0($v0)
-	
-	check_emptiness:			
-		beq $t1, $t2, is_not_empty
-		beq $t1, $t3, is_not_empty
-	is_empty:
-		li $t4, 0
-		li $t5, 0
-		jr $ra
-	is_not_empty:
-		beq $t1, $t0, can_win
-		j cannot_win
-		
-	can_win:
-		li $t5, 1
-	cannot_win:
-		li $t5, 0
-	
-	# body end
-	lw $ra, 0($sp)
-	addi $sp, $sp, 4
-	jr $ra
+    	lw $s2, row_col_size     # bound
+    	lw $t2, player1_char
+    	lw $t3, player2_char
+    	li $t4, 1                # assume draw
+
+#### Check rows
+	check_rows1:
+    	li $s0, 0	# row index
+	check_rows_loop:
+    		beq $s0, $s2, check_cols
+    		li $s1, 0		# col index
+    		li $t5, -1              # prev char
+    		li $t6, 0               # counter
+		row_loop:
+   			beq $s1, $s2, next_row
+   			move $a0, $s0
+    			move $a1, $s1
+    			jal get_ij_element_address
+    			lw $t1, 0($v0)
+    			
+    			bge $t1, 'A', row_field_not_empty
+    			li $t4, 0
+    			j row_continue 
+    			
+			row_field_not_empty:
+    			beq $t1, $t5, row_same
+    			move $t5, $t1
+    			li $t6, 1
+    			j row_continue    			
+		row_same:
+    			addi $t6, $t6, 1
+    			beq $t6, $s2, row_win
+		row_continue:
+    			addi $s1, $s1, 1
+    			j row_loop
+		next_row:
+    			addi $s0, $s0, 1
+    			j check_rows_loop
+		row_win:
+    			move $v0, $t1
+    			j end_check
+
+#### Check columns
+	check_cols:
+	li $s1, 0
+	check_cols_loop:
+    		beq $s1, $s2, check_diag1
+    		li $s0, 0
+    		li $t5, -1
+    		li $t6, 0
+		col_loop:
+    			beq $s0, $s2, next_col
+    			move $a0, $s0
+    			move $a1, $s1
+    			jal get_ij_element_address
+			lw $t1, 0($v0)
+			
+    			bge $t1, 'A', col_field_not_empty
+    			li $t4, 0
+    			j col_continue 
+    			
+			col_field_not_empty:
+    			beq $t1, $t5, col_same
+    			move $t5, $t1
+    			li $t6, 1
+    			j col_continue
+		col_same:
+    			addi $t6, $t6, 1
+    			beq $t6, $s2, col_win
+		col_continue:
+  		  	addi $s0, $s0, 1
+    			j col_loop
+		next_col:
+    			addi $s1, $s1, 1
+    			j check_cols_loop
+		col_win:
+   			move $v0, $t1
+    			j end_check
+
+#### Check main diagonal (top-left to bottom-right)
+	check_diag1:
+   	li $s0, 0
+	li $t5, -1
+    	li $t6, 0
+	diag1_loop:
+    		beq $s0, $s2, check_diag2
+    		move $a0, $s0
+    		move $a1, $s0
+    		jal get_ij_element_address
+    		lw $t1, 0($v0)
+    		
+		bge $t1, 'A', diag1_field_not_empty
+    		li $t4, 0
+    		j diag1_continue 
+    			
+		diag1_field_not_empty:
+    		beq $t1, $t5, diag1_same
+		move $t5, $t1
+    		li $t6, 1
+    		j diag1_continue
+	diag1_same:
+		addi $t6, $t6, 1
+    		beq $t6, $s2, diag1_win
+	diag1_continue:
+    		addi $s0, $s0, 1
+    		j diag1_loop
+	diag1_win:
+    		move $v0, $t1
+    		j end_check
+
+#### Check anti-diagonal (top-right to bottom-left)
+	check_diag2:
+    	li $s0, 0
+    	li $t5, -1
+    	li $t6, 0
+	diag2_loop:
+    		beq $s0, $s2, end_check_with_no_winner
+    		move $a0, $s0
+    		sub $a1, $s2, $s0
+    		subi $a1, $a1, 1
+    		jal get_ij_element_address
+    		lw $t1, 0($v0)
+    		
+    		bge $t1, 'A', diag2_field_not_empty
+    		li $t4, 0
+    		j diag2_continue 
+    			
+		diag2_field_not_empty:
+    		beq $t1, $t5, diag2_same
+    		move $t5, $t1
+    		li $t6, 1
+    		j diag2_continue
+	diag2_same:
+    		addi $t6, $t6, 1
+    		beq $t6, $s2, diag2_win
+	diag2_continue:
+    		addi $s0, $s0, 1
+    		j diag2_loop
+	diag2_win:
+    		move $v0, $t1
+    		j end_check
+
+	end_check_with_no_winner:
+    	move $v0, $t4  # if still 1, it's a draw; else 0
+	end_check:
+    	lw $ra, 0($sp)
+    	lw $s0, 4($sp)
+    	lw $s1, 8($sp)
+    	lw $s2, 12($sp)
+    	addi $sp, $sp, 16
+    	jr $ra
 
 
 # Player a0 move
@@ -244,6 +314,7 @@ human_move:
 	jr $ra
 
 
+# TODO
 ai_move:
 	addi $sp, $sp, -4
 	sw $ra, 0($sp)
@@ -387,3 +458,14 @@ print_board:
 end:
 	li $v0, 10
 	syscall
+
+debug:
+move $t9, $v0
+move $t8, $a0
+li $v0, 4
+la $a0, debug_prompt
+syscall
+move $v0, $t9 
+move $a0, $t8 
+jr $ra
+
