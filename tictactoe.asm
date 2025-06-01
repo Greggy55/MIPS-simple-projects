@@ -26,9 +26,21 @@
 	player2_char:		.word 88
 # ---
 
+# Random
+	seed:       .word 1
+	a_const:    .word 1103515245
+	c_const:    .word 12345
+	mod_mask:   .word 0x7FFFFFFF
+# ------
+
 .text
 
 main:
+	# seed
+	li $v0, 30         
+    	syscall              
+    	sw $a0, seed
+
 	li $v0, 4
 	la $a0, input_number_of_rounds
 	syscall
@@ -452,6 +464,37 @@ print_board:
 	lw $s2, 12($sp)
 	addi $sp, $sp, 16
 	jr $ra
+
+
+# Rand
+# a0 - low
+# a1 - high
+# v0 - element of [a0, a1]
+rand:
+	# body start
+    	lw  $t0, seed
+    	lw  $t1, a_const
+    	lw  $t2, c_const
+    	lw  $t3, mod_mask
+
+    	mul $t4, $t0, $t1	# seed * a
+    	add $t4, $t4, $t2	# seed * a + c
+    	and $t4, $t4, $t3	# (seed * a + c) % 2^31
+
+    	sw  $t4, seed
+
+	move $t0, $a0		# low
+	move $t1, $a1        	# high
+    	sub  $t2, $t1, $t0	# high - low
+    	addi $t2, $t2, 1      	# high - low + 1
+
+	div  $t4, $t2
+    	mfhi $t4              # rand() % (high - low + 1)
+    	add  $t4, $t4, $t0    # rand() % (high - low + 1) + low
+
+	move $v0, $t4
+	# body end
+    	jr   $ra
 
 
 # End 
