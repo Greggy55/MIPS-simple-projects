@@ -17,7 +17,8 @@
 	winner:			.asciiz "Wygrywa gracz "
 	draw:			.asciiz "Remis\n"
 	debug_prompt:		.asciiz "\nDEBUG\n"
-	prompt_press_any_key:		.asciiz "Wcisnij dowolny przycisk aby kontynuowac..."
+	prompt_press_any_key:	.asciiz "Wcisnij dowolny przycisk aby kontynuowac..."
+	game_type_prompt:	.asciiz "Podaj rodzaj rozgrywki:\n 1 - czlowiek vs czlowiek (domyœlne)\n 2 - czlowiek vs komputer\n 3 - komputer vs komputer\n"
 # -------
 
 # GUI
@@ -61,10 +62,43 @@ main:
 		j main_loop
 
 new_game:
-	addi $sp, $sp, -8
+	addi $sp, $sp, -16
 	sw $ra, 0($sp)
 	sw $s0, 4($sp)
+	sw $s1, 8($sp)
+	sw $s2, 12($sp)
 	# body start
+	
+	li $v0, 4
+	la $a0, game_type_prompt
+	syscall
+	
+	li $v0, 5
+	syscall
+	
+	beq $v0, 1, human_vs_human
+	beq $v0, 2, human_vs_ai
+	beq $v0, -2, ai_vs_human
+	beq $v0, 3, ai_vs_ai
+	
+	human_vs_human:
+		li $s1, 1
+		li $s2, 1
+		j game_start
+	human_vs_ai:
+		li $s1, 1
+		li $s2, 0
+		j game_start
+	ai_vs_human:
+		li $s1, 0
+		li $s2, 1
+		j game_start
+	ai_vs_ai:
+		li $s1, 0
+		li $s2, 0
+		j game_start
+	
+	game_start:
 	
 	jal print_board
 	
@@ -74,7 +108,7 @@ new_game:
 		bnez $t0, print_results
 	
 		li $a0, 1
-		li $a1, 1
+		move $a1, $s1
 		jal player_a0_move
 		
 		jal print_board
@@ -84,7 +118,7 @@ new_game:
 		bnez $t0, print_results
 		
 		li $a0, 2
-		li $a1, 0
+		move $a1, $s2
 		jal player_a0_move
 		
 		jal print_board
@@ -115,10 +149,13 @@ new_game:
 	li $v0, 4
 	la $a0, new_line
 	syscall
+	
 	# body end
 	lw $ra, 0($sp)
 	lw $s0, 4($sp)
-	addi $sp, $sp, 8
+	lw $s1, 8($sp)
+	lw $s2, 12($sp)
+	addi $sp, $sp, 16
 	jr $ra
 
 # Check ame end
