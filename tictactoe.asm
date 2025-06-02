@@ -15,8 +15,9 @@
 	input_field_number:	.asciiz "Podaj numer wolnego pola: "
 	game_over:		.asciiz "Koniec Gry!\n"
 	winner:			.asciiz "Wygrywa gracz "
-	draw:			.asciiz "Remis"
+	draw:			.asciiz "Remis\n"
 	debug_prompt:		.asciiz "\nDEBUG\n"
+	prompt_ai_move:		.asciiz "Wcisnij dowolny przycisk aby kontynuowac..."
 # -------
 
 # GUI
@@ -339,186 +340,187 @@ human_move:
 	jr $ra
 
 
+# AI move
 ai_move:
-    addi $sp, $sp, -32
-    sw $ra, 0($sp)
-    sw $s0, 4($sp)
-    sw $s1, 8($sp)
-    sw $s2, 12($sp)
-    sw $s3, 16($sp)
-    sw $s4, 20($sp)
-    sw $s5, 24($sp)
-    sw $s6, 28($sp)
+    	addi $sp, $sp, -32
+    	sw $ra, 0($sp)
+    	sw $s0, 4($sp)
+    	sw $s1, 8($sp)
+    	sw $s2, 12($sp)
+    	sw $s3, 16($sp)
+    	sw $s4, 20($sp)
+    	sw $s5, 24($sp)
+    	sw $s6, 28($sp)
+    	# body start
+    	
+    	li $v0, 4
+	la $a0, prompt_ai_move
+	syscall
+	li $v0, 8
+	li $a0, 0
+	li $a1, 0
+	syscall
+	li $v0, 4
+	la $a0, new_line
+	syscall
 
-    lw $s2, row_col_size         # rozmiar planszy
-    lw $s3, player1_char         # gracz
-    lw $s4, player2_char         # komputer (AI)
+    	lw $s2, row_col_size         # bound
+    	lw $s3, player1_char         # opponent
+    	lw $s4, player2_char         # ai
 
-#############################
-# 1. SprawdŸ: AI mo¿e wygraæ?
-#############################
-jal debug
-    li $s0, 0        # i
-check_ai_win_row:
-    beq $s0, $s2, check_block_player
-    li $s1, 0        # j
-check_ai_win_col:
-    beq $s1, $s2, ai_win_next_row
+# Win if possible
+    	li $s0, 0        # i
+	check_ai_win_row:
+    		beq $s0, $s2, check_block_player
+    		li $s1, 0        # j
+	check_ai_win_col:
+    		beq $s1, $s2, ai_win_next_row
 
-    move $a0, $s0
-    move $a1, $s1
-    jal is_occupied
-    bnez $v0, ai_win_continue
+    		move $a0, $s0
+    		move $a1, $s1
+    		jal is_occupied
+    		bnez $v0, ai_win_continue
 
-    # tymczasowy ruch AI
-    move $s5, $v1	# save address
-    lw $s6, 0($s5)	# save value
-    sw $s4, 0($s5)	# override value
-    jal check_game_end
-    move $t2, $v0	# get game result
-    move $a0, $s5	# argument for ai move
-    beq $t2, $s4, do_ai_move   # wygrywamy!
-    sw $s6, 0($s5)             # restore value (empty => index nnumber)
+    		# temporary AI move
+    		move $s5, $v1	# save address
+    		lw $s6, 0($s5)	# save value
+    		sw $s4, 0($s5)	# override value
+    		jal check_game_end
+    		move $t2, $v0	# get game result
+    		move $a0, $s5	# argument for ai move
+    		beq $t2, $s4, do_ai_move   # win
+    		sw $s6, 0($s5)             # restore value (empty => index nnumber)
 
-ai_win_continue:
-    addi $s1, $s1, 1
-    j check_ai_win_col
-ai_win_next_row:
-    addi $s0, $s0, 1
-    j check_ai_win_row
+	ai_win_continue:
+    		addi $s1, $s1, 1
+    		j check_ai_win_col
+	ai_win_next_row:
+    		addi $s0, $s0, 1
+    		j check_ai_win_row
 
-#############################
-# 2. SprawdŸ: gracz mo¿e wygraæ?
-#############################
-check_block_player:
-jal debug
-    li $s0, 0
-block_loop_row:
-    beq $s0, $s2, check_center
-    li $s1, 0
-block_loop_col:
-    beq $s1, $s2, block_next_row
+# Block if possible
+	check_block_player:
+    		li $s0, 0
+	block_loop_row:
+    		beq $s0, $s2, check_center
+    		li $s1, 0
+	block_loop_col:
+    		beq $s1, $s2, block_next_row
 
-    move $a0, $s0
-    move $a1, $s1
-    jal is_occupied
-    bnez $v0, block_continue
+    		move $a0, $s0
+    		move $a1, $s1
+    		jal is_occupied
+    		bnez $v0, block_continue
 
-    # tymczasowy ruch gracza
-    move $s5, $v1
-    lw $s6, 0($s5)
-    sw $s3, 0($s5)
-    jal check_game_end
-    move $t2, $v0
-    move $a0, $s5
-    beq $t2, $s3, do_block_move   # zablokuj gracza
-    sw $s6, 0($s5)
+    		# temporary opponent move
+    		move $s5, $v1
+    		lw $s6, 0($s5)
+    		sw $s3, 0($s5)
+    		jal check_game_end
+    		move $t2, $v0
+    		move $a0, $s5
+    		beq $t2, $s3, do_block_move   # block
+    		sw $s6, 0($s5)
 
-block_continue:
-    addi $s1, $s1, 1
-    j block_loop_col
-block_next_row:
-    addi $s0, $s0, 1
-    j block_loop_row
-do_block_move:
-    sw $s4, 0($s5)
-    j ai_move_done
+	block_continue:
+    		addi $s1, $s1, 1
+    		j block_loop_col
+	block_next_row:
+    		addi $s0, $s0, 1
+    		j block_loop_row
+	do_block_move:
+    		sw $s4, 0($s5)
+    		j ai_move_done
 
-#############################
-# 3. Zajmij œrodek
-#############################
-check_center:
-jal debug
-    move $t0, $s2
-    srl $t0, $t0, 1   # t0 = s2 / 2
+# Take the center if possible
+	check_center:
+    		move $t0, $s2
+    		srl $t0, $t0, 1   # t0 = s2 / 2
     
-    move $a0, $t0
-    move $a1, $t0
-    jal is_occupied
-    bnez $v0, check_corners  # nie pusty
+    		move $a0, $t0
+    		move $a1, $t0
+    		jal is_occupied
+    		bnez $v0, check_corners  # nie pusty
     
-    # wykonaj ruch w œrodek
-    sw $s4, 0($v1)
-    j ai_move_done
+    	# Take the center
+    	sw $s4, 0($v1)
+    	j ai_move_done
 
-#############################
-# 4. Zajmij pierwszy wolny róg
-#############################
-check_corners:
-jal debug
-    li $s5, 0
-corner_loop:
-    li $t0, 0
-    li $t1, 0
-    beq $s5, 1, c1
-    beq $s5, 2, c2
-    beq $s5, 3, c3
-    j c0
-c0: li $t0, 0        # (0,0)
-    li $t1, 0
-    j corner_check
-c1: li $t0, 0        # (0, N-1)
-    sub $t1, $s2, 1
-    j corner_check
-c2: sub $t0, $s2, 1  # (N-1, 0)
-    li $t1, 0
-    j corner_check
-c3: sub $t0, $s2, 1  # (N-1, N-1)
-    sub $t1, $s2, 1
-corner_check:
-    move $a0, $t0
-    move $a1, $t1
-    jal is_occupied
-    move $a0, $v1
-    beqz $v0, do_ai_move     # puste? ? ruch
+# Take the corner if possible
+	check_corners:
+    		li $s5, 0
+	corner_loop:
+    		li $t0, 0
+    		li $t1, 0
+    		beq $s5, 1, c1
+    		beq $s5, 2, c2
+    		beq $s5, 3, c3
+    		j c0
+    		
+		c0: 
+			li $t0, 0        # (0,0)
+    			li $t1, 0
+    			j corner_check
+		c1: 
+			li $t0, 0        # (0, N-1)
+    			sub $t1, $s2, 1
+    			j corner_check
+		c2: 
+			sub $t0, $s2, 1  # (N-1, 0)
+    			li $t1, 0
+    			j corner_check
+		c3: 
+			sub $t0, $s2, 1  # (N-1, N-1)
+    			sub $t1, $s2, 1
+		corner_check:
+    			move $a0, $t0
+    			move $a1, $t1
+    			jal is_occupied
+    			move $a0, $v1
+    			beqz $v0, do_ai_move     # puste? ? ruch
 
-    addi $s5, $s5, 1
-    blt $s5, 4, corner_loop
+    		addi $s5, $s5, 1
+    		blt $s5, 4, corner_loop
 
-#############################
-# 5. Zajmij pierwsze wolne pole
-#############################
-jal debug
-    li $s0, 0
-any_row:
-    beq $s0, $s2, ai_move_done
-    li $s1, 0
-any_col:
-    beq $s1, $s2, any_next
+# Take any
+    	li $s0, 0
+	any_row:
+    		beq $s0, $s2, ai_move_done
+    		li $s1, 0
+	any_col:
+    		beq $s1, $s2, any_next
     
-    move $a0, $t0
-    move $a1, $t1
-    jal is_occupied
-    move $a0, $v1
-    beqz $v0, do_ai_move     # puste? ? ruch
+    		move $a0, $t0
+    		move $a1, $t1
+    		jal is_occupied
+    		move $a0, $v1
+    		beqz $v0, do_ai_move     # puste? ? ruch
     
-    addi $s1, $s1, 1
-    j any_col
-any_next:
-    addi $s0, $s0, 1
-    j any_row
+    		addi $s1, $s1, 1
+    		j any_col
+	any_next:
+    		addi $s0, $s0, 1
+    		j any_row
 
-#############################
-# Ruch AI – wykonanie
-#############################
-do_ai_move:
-    sw $s4, 0($a0)
-    j ai_move_done
+# Make move
+	do_ai_move:
+    		sw $s4, 0($a0)
+		j ai_move_done
 
-#############################
-# Zakoñczenie
-#############################
-ai_move_done:
-    lw $ra, 0($sp)
-    lw $s0, 4($sp)
-    lw $s1, 8($sp)
-    lw $s2, 12($sp)
-    lw $s3, 16($sp)
-    lw $s4, 20($sp)
-    lw $s5, 24($sp)
-    lw $s6, 28($sp)
-    addi $sp, $sp, 32
-    jr $ra
+# End ai move
+	ai_move_done:
+	
+	# body end
+    	lw $ra, 0($sp)
+    	lw $s0, 4($sp)
+    	lw $s1, 8($sp)
+    	lw $s2, 12($sp)
+    	lw $s3, 16($sp)
+    	lw $s4, 20($sp)
+    	lw $s5, 24($sp)
+    	lw $s6, 28($sp)
+    	addi $sp, $sp, 32
+    	jr $ra
 
 
 # Checks if a field is occupied
