@@ -69,7 +69,7 @@ new_game:
 		bnez $t0, print_results
 	
 		li $a0, 1
-		li $a1, 0
+		li $a1, 1
 		jal player_a0_move
 		
 		jal print_board
@@ -320,23 +320,43 @@ player_a0_move:
 # v0 - field i
 # v1 - field j
 human_move:
-	addi $sp, $sp, -4
+	addi $sp, $sp, -12
 	sw $ra, 0($sp)
+	sw $s0, 4($sp)
+	sw $s1, 8($sp)
 	# body start
 	
-	li $v0, 4
-	la $a0, input_field_number
-	syscall
+	loop_until_valid_field_given:
+		li $v0, 4
+		la $a0, input_field_number
+		syscall
 	
-	li $v0, 5
-	syscall
+		li $v0, 5
+		syscall
+		
+		bgt $v0, 9, loop_until_valid_field_given
+		blt $v0, 1, loop_until_valid_field_given
 	
-	move $a0, $v0
-	jal convert_to_ij
+		move $a0, $v0
+		jal convert_to_ij
+	
+		move $s0, $v0
+		move $s1, $v1
+	
+		move $a0, $v0
+		move $a1, $v1
+		jal is_occupied
+	
+    		beq $v0, 1, loop_until_valid_field_given
+    	
+    	move $v0, $s0
+    	move $v1, $s1
 	
 	# body end
 	lw $ra, 0($sp)
-	addi $sp, $sp, 4
+	lw $s0, 4($sp)
+	lw $s1, 8($sp)
+	addi $sp, $sp, 12
 	jr $ra
 
 
