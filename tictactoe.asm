@@ -371,17 +371,14 @@ check_ai_win_col:
     bnez $v0, ai_win_continue
 
     # tymczasowy ruch AI
-    move $a0, $s0
-    move $a1, $s1
-    jal get_ij_element_address
-    move $s5, $v0
-    lw $s6, 0($s5)
-    sw $s4, 0($s5)
+    move $s5, $v1	# save address
+    lw $s6, 0($s5)	# save value
+    sw $s4, 0($s5)	# override value
     jal check_game_end
-    move $t2, $v0
-    move $a0, $s5
+    move $t2, $v0	# get game result
+    move $a0, $s5	# argument for ai move
     beq $t2, $s4, do_ai_move   # wygrywamy!
-    sw $s6, 0($s5)             # przywróæ puste
+    sw $s6, 0($s5)             # restore value (empty => index nnumber)
 
 ai_win_continue:
     addi $s1, $s1, 1
@@ -408,14 +405,12 @@ block_loop_col:
     bnez $v0, block_continue
 
     # tymczasowy ruch gracza
-    move $a0, $s0
-    move $a1, $s1
-    jal get_ij_element_address
-    move $s5, $v0
+    move $s5, $v1
     lw $s6, 0($s5)
     sw $s3, 0($s5)
     jal check_game_end
     move $t2, $v0
+    move $a0, $s5
     beq $t2, $s3, do_block_move   # zablokuj gracza
     sw $s6, 0($s5)
 
@@ -443,10 +438,7 @@ jal debug
     bnez $v0, check_corners  # nie pusty
     
     # wykonaj ruch w œrodek
-    move $a0, $t0
-    move $a1, $t0
-    jal get_ij_element_address
-    sw $s4, 0($v0)
+    sw $s4, 0($v1)
     j ai_move_done
 
 #############################
@@ -476,14 +468,8 @@ c3: sub $t0, $s2, 1  # (N-1, N-1)
 corner_check:
     move $a0, $t0
     move $a1, $t1
-    jal get_ij_element_address
-    move $t9, $v0
-    
-    move $a0, $t0
-    move $a1, $t1
     jal is_occupied
-    move $a0, $v0
-    move $v0, $t9
+    move $a0, $v1
     beqz $v0, do_ai_move     # puste? ? ruch
 
     addi $s5, $s5, 1
@@ -502,14 +488,8 @@ any_col:
     
     move $a0, $t0
     move $a1, $t1
-    jal get_ij_element_address
-    move $t9, $v0
-    
-    move $a0, $t0
-    move $a1, $t1
     jal is_occupied
-    move $a0, $v0
-    move $v0, $t9
+    move $a0, $v1
     beqz $v0, do_ai_move     # puste? ? ruch
     
     addi $s1, $s1, 1
@@ -541,18 +521,22 @@ ai_move_done:
     jr $ra
 
 
-# Checks if a field is occupied (returns 1 in v0 if yes)
+# Checks if a field is occupied
 # a0 - i
 # a1 - j
+# v0 - is occupied 0/1
+# v1 - [i][j] address
 is_occupied:
     addi $sp, $sp, -16
     sw $ra, 0($sp)
     sw $s0, 4($sp)
     sw $s1, 8($sp)
     sw $s2, 12($sp)
+    # body start
     
     jal get_ij_element_address
     lw $s0, 0($v0)
+    move $v1, $v0	# retrun address
 
     lw $s1, player1_char
     lw $s2, player2_char
@@ -564,6 +548,7 @@ set_occupied:
     li $v0, 1
 end_is_occupied:
     
+    # body end
     lw $ra, 0($sp)
     lw $s0, 4($sp)
     lw $s1, 8($sp)
