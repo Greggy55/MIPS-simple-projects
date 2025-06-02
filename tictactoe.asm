@@ -17,9 +17,11 @@
 	winner:			.asciiz "Wygrywa gracz "
 	draw:			.asciiz "Remis"
 	prompt_press_any_key:	.asciiz "Wcisnij dowolny przycisk aby kontynuowac..."
-	game_type_prompt:	.asciiz "Podaj rodzaj rozgrywki:\n 1 - czlowiek vs czlowiek (domyœlne)\n 2 - czlowiek vs komputer\n 3 - komputer vs komputer\n"
-	game_results_prompt:	.asciiz "Aktualne wyniki:\n"
+	game_type_prompt:	.asciiz "Podaj rodzaj rozgrywki:\n 1 - czlowiek vs czlowiek (domyslne)\n 2 - czlowiek vs komputer\n 3 - komputer vs komputer\n"
+	game_results_prompt:	.asciiz "\nAktualne wyniki:\n"
 	point_prompt:		.asciiz " pkt\n"
+	final_prompt:		.asciiz "Wszystkie rundy zostaly zakonczone.\n"
+	final_draw:		.asciiz "Gra zakonczyla sie remisem.\n"
 # -------
 
 # GUI
@@ -141,6 +143,9 @@ new_game:
 		syscall
 		li $v0, 11
 		move $a0, $t0
+		syscall
+		li $v0, 4
+		la $a0, new_line
 		syscall
 		
 		lw $s0, player2_char
@@ -849,37 +854,6 @@ reset_board:
 	jr $ra
 
 
-# Rand
-# a0 - low
-# a1 - high
-# v0 - element of [a0, a1]
-rand:
-	# body start
-    	lw  $t0, seed
-    	lw  $t1, a_const
-    	lw  $t2, c_const
-    	lw  $t3, mod_mask
-
-    	mul $t4, $t0, $t1	# seed * a
-    	add $t4, $t4, $t2	# seed * a + c
-    	and $t4, $t4, $t3	# (seed * a + c) % 2^31
-
-    	sw  $t4, seed
-
-	move $t0, $a0		# low
-	move $t1, $a1        	# high
-    	sub  $t2, $t1, $t0	# high - low
-    	addi $t2, $t2, 1      	# high - low + 1
-
-	div  $t4, $t2
-    	mfhi $t4              # rand() % (high - low + 1)
-    	add  $t4, $t4, $t0    # rand() % (high - low + 1) + low
-
-	move $v0, $t4
-	# body end
-    	jr   $ra
-
-
 # Ask any key
 ask_any_key:
 	li $v0, 4
@@ -898,6 +872,35 @@ ask_any_key:
 
 # End 
 end:
+	li $v0, 4
+	la $a0, final_prompt
+	syscall
+	
+    	beq $t7, $t8, its_draw
+    	
+    	li $v0, 4
+	la $a0, winner
+	syscall
+	
+    	blt $t7, $t8, its_p2
+	
+	its_p1:
+		li $v0, 11
+		lw $a0, player1_char
+		syscall
+		j its_the_end
+	its_p2:
+		li $v0, 11
+		lw $a0, player2_char
+		syscall
+		j its_the_end
+	its_draw:
+		li $v0, 4
+		la $a0, final_draw
+		syscall
+	
+	its_the_end:
+	
 	li $v0, 10
 	syscall
 
