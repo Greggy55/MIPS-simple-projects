@@ -69,7 +69,7 @@ new_game:
 		bnez $t0, print_results
 	
 		li $a0, 1
-		li $a1, 1
+		li $a1, 0
 		jal player_a0_move
 		
 		jal print_board
@@ -341,6 +341,7 @@ human_move:
 
 
 # AI move
+# a0 - player number
 ai_move:
     	addi $sp, $sp, -32
     	sw $ra, 0($sp)
@@ -352,6 +353,8 @@ ai_move:
     	sw $s5, 24($sp)
     	sw $s6, 28($sp)
     	# body start
+    	
+    	move $t0, $a0
     	
     	li $v0, 4
 	la $a0, prompt_ai_move
@@ -365,10 +368,19 @@ ai_move:
 	syscall
 
     	lw $s2, row_col_size         # bound
-    	lw $s3, player1_char         # opponent
-    	lw $s4, player2_char         # ai
+    	
+    	beq $t0, 1, ai_is_p1
+    	ai_is_p2:
+    		lw $s3, player1_char         # opponent
+    		lw $s4, player2_char         # ai
+    		j check_ai_win
+    	ai_is_p1:
+    		lw $s4, player1_char         # ai
+    		lw $s3, player2_char         # opponent
+    		j check_ai_win
 
 # Win if possible
+	check_ai_win:
     	li $s0, 0        # i
 	check_ai_win_row:
     		beq $s0, $s2, check_block_player
@@ -490,8 +502,8 @@ ai_move:
 	any_col:
     		beq $s1, $s2, any_next
     
-    		move $a0, $t0
-    		move $a1, $t1
+    		move $a0, $s0
+    		move $a1, $s1
     		jal is_occupied
     		move $a0, $v1
     		beqz $v0, do_ai_move     # puste? ? ruch
