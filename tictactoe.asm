@@ -15,15 +15,17 @@
 	input_field_number:	.asciiz "Podaj numer wolnego pola: "
 	game_over:		.asciiz "Koniec Gry!\n"
 	winner:			.asciiz "Wygrywa gracz "
-	draw:			.asciiz "Remis\n"
-	debug_prompt:		.asciiz "\nDEBUG\n"
+	draw:			.asciiz "Remis"
 	prompt_press_any_key:	.asciiz "Wcisnij dowolny przycisk aby kontynuowac..."
 	game_type_prompt:	.asciiz "Podaj rodzaj rozgrywki:\n 1 - czlowiek vs czlowiek (domyœlne)\n 2 - czlowiek vs komputer\n 3 - komputer vs komputer\n"
+	game_results_prompt:	.asciiz "Aktualne wyniki:\n"
+	point_prompt:		.asciiz " pkt\n"
 # -------
 
 # GUI
 	v_bar:			.asciiz "|"
 	new_line:		.asciiz "\n"
+	dash:			.asciiz " - "
 	player1_char:		.word 79
 	player2_char:		.word 88
 # ---
@@ -34,6 +36,8 @@
 	c_const:    .word 12345
 	mod_mask:   .word 0x7FFFFFFF
 # ------
+
+# Warning: t7, t8 and t9 are used to store game results and should not be modified
 
 .text
 
@@ -138,14 +142,80 @@ new_game:
 		li $v0, 11
 		move $a0, $t0
 		syscall
-		j game_end
+		
+		lw $s0, player2_char
+		beq $t0, $s0, p2_winner
+		
+		p1_winner:
+			add $t7, $t7, 1
+			j game_end
+		p2_winner:
+			add $t8, $t8, 1
+			j game_end
 	game_draw:
 		li $v0, 4
 		la $a0, draw
 		syscall
+		la $a0, new_line
+		syscall
+		
+		add $t9, $t9, 1
+		
 		j game_end
 	
 	game_end:
+	li $v0, 4
+	la $a0, game_results_prompt
+	syscall
+	
+	
+	li $v0, 11
+	lw $a0, player1_char
+	syscall
+	
+	li $v0, 4
+	la $a0, dash
+	syscall
+	
+	li $v0, 1
+	move $a0, $t7
+	syscall
+	
+	li $v0, 4
+	la $a0, point_prompt
+	syscall
+	
+	
+	li $v0, 11
+	lw $a0, player2_char
+	syscall
+	
+	li $v0, 4
+	la $a0, dash
+	syscall
+	
+	li $v0, 1
+	move $a0, $t8
+	syscall
+	
+	li $v0, 4
+	la $a0, point_prompt
+	syscall
+	
+	
+	li $v0, 4
+	la $a0, draw
+	syscall
+	
+	li $v0, 4
+	la $a0, dash
+	syscall
+	
+	li $v0, 1
+	move $a0, $t9
+	syscall
+	
+	
 	li $v0, 4
 	la $a0, new_line
 	syscall
@@ -830,14 +900,4 @@ ask_any_key:
 end:
 	li $v0, 10
 	syscall
-
-debug:
-move $t9, $v0
-move $t8, $a0
-li $v0, 4
-la $a0, debug_prompt
-syscall
-move $v0, $t9 
-move $a0, $t8 
-jr $ra
 
