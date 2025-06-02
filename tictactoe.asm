@@ -17,7 +17,7 @@
 	winner:			.asciiz "Wygrywa gracz "
 	draw:			.asciiz "Remis\n"
 	debug_prompt:		.asciiz "\nDEBUG\n"
-	prompt_ai_move:		.asciiz "Wcisnij dowolny przycisk aby kontynuowac..."
+	prompt_press_any_key:		.asciiz "Wcisnij dowolny przycisk aby kontynuowac..."
 # -------
 
 # GUI
@@ -52,13 +52,18 @@ main:
 	
 	main_loop:
 		beqz $s0, end
+		
+		jal reset_board
 		jal new_game
+		jal ask_any_key
 		sub $s0, $s0, 1
+		
 		j main_loop
-	
+
 new_game:
-	addi $sp, $sp, -4
+	addi $sp, $sp, -8
 	sw $ra, 0($sp)
+	sw $s0, 4($sp)
 	# body start
 	
 	jal print_board
@@ -107,9 +112,13 @@ new_game:
 		j game_end
 	
 	game_end:
+	li $v0, 4
+	la $a0, new_line
+	syscall
 	# body end
 	lw $ra, 0($sp)
-	addi $sp, $sp, 4
+	lw $s0, 4($sp)
+	addi $sp, $sp, 8
 	jr $ra
 
 # Check ame end
@@ -376,16 +385,7 @@ ai_move:
     	
     	move $t0, $a0
     	
-    	li $v0, 4
-	la $a0, prompt_ai_move
-	syscall
-	li $v0, 8
-	li $a0, 0
-	li $a1, 0
-	syscall
-	li $v0, 4
-	la $a0, new_line
-	syscall
+    	jal ask_any_key
 
     	lw $s2, row_col_size         # bound
     	
@@ -561,34 +561,36 @@ ai_move:
 # v0 - is occupied 0/1
 # v1 - [i][j] address
 is_occupied:
-    addi $sp, $sp, -16
-    sw $ra, 0($sp)
-    sw $s0, 4($sp)
-    sw $s1, 8($sp)
-    sw $s2, 12($sp)
-    # body start
+   	addi $sp, $sp, -16
+    	sw $ra, 0($sp)
+    	sw $s0, 4($sp)
+    	sw $s1, 8($sp)
+    	sw $s2, 12($sp)
+    	# body start
     
-    jal get_ij_element_address
-    lw $s0, 0($v0)
-    move $v1, $v0	# retrun address
+    	jal get_ij_element_address
+    	lw $s0, 0($v0)
+    	move $v1, $v0	# retrun address
 
-    lw $s1, player1_char
-    lw $s2, player2_char
-    li $v0, 0
-    beq $s0, $s1, set_occupied
-    beq $s0, $s2, set_occupied
-    j end_is_occupied
-set_occupied:
-    li $v0, 1
-end_is_occupied:
+    	lw $s1, player1_char
+    	lw $s2, player2_char
+    	li $v0, 0
+    	beq $s0, $s1, set_occupied
+    	beq $s0, $s2, set_occupied
+    	j end_is_occupied
+    	
+	set_occupied:
+    		li $v0, 1
+    	
+	end_is_occupied:
     
-    # body end
-    lw $ra, 0($sp)
-    lw $s0, 4($sp)
-    lw $s1, 8($sp)
-    lw $s2, 12($sp)
-    addi $sp, $sp, 16
-    jr $ra
+    	# body end
+    	lw $ra, 0($sp)
+    	lw $s0, 4($sp)
+    	lw $s1, 8($sp)
+    	lw $s2, 12($sp)
+    	addi $sp, $sp, 16
+    	jr $ra
 
 
 # Convert n to [i][j]
@@ -719,6 +721,27 @@ print_board:
 	jr $ra
 
 
+# Reset board
+reset_board:
+	la $t0, board		# board address
+	li $t1, 0		# index counter
+	li $t2, '1'		# current char
+	lw $t3, size		# bound
+
+	reset_loop:
+		beq $t1, $t3, reset_done
+
+		sw $t2, 0($t0)	
+		addiu $t0, $t0, DATA_SIZE
+		addiu $t2, $t2, 1
+		addiu $t1, $t1, 1
+
+		j reset_loop
+
+	reset_done:
+	jr $ra
+
+
 # Rand
 # a0 - low
 # a1 - high
@@ -748,6 +771,22 @@ rand:
 	move $v0, $t4
 	# body end
     	jr   $ra
+
+
+# Ask any key
+ask_any_key:
+	li $v0, 4
+	la $a0, prompt_press_any_key
+	syscall
+	li $v0, 8
+	li $a0, 0
+	li $a1, 0
+	syscall
+	li $v0, 4
+	la $a0, new_line
+	syscall
+	
+	jr $ra
 
 
 # End 
