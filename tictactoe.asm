@@ -32,23 +32,11 @@
 	player2_char:		.word 88
 # ---
 
-# Random
-	seed:       .word 1
-	a_const:    .word 1103515245
-	c_const:    .word 12345
-	mod_mask:   .word 0x7FFFFFFF
-# ------
-
 # Warning: t7, t8 and t9 are used to store game results and should not be modified
 
 .text
 
 main:
-	# seed
-	li $v0, 30         
-    	syscall              
-    	sw $a0, seed
-
 	li $v0, 4
 	la $a0, input_number_of_rounds
 	syscall
